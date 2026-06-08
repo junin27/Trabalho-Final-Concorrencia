@@ -42,7 +42,7 @@
 
 % Configuração para listagem de logs e código
 \lstset{
-    basicstyle=\small\ttfamily,
+    basicstyle=\scriptsize\ttfamily,
     columns=flexible,
     breaklines=true,
     frame=single,
@@ -67,16 +67,17 @@
 
 \textbf{\LARGE Atividade Prática: Entrega 02}\\[0.5cm]
 \textbf{\Large Soluções de Concorrência e Análise Comparativa}\\[3cm]
+\end{center}
 
 \begin{flushright}
 \textbf{Docente:} Prof. Gustavo Martins Lima \\[0.2cm]
-\textbf{Discentes:} \\[0.1cm]
-Erick Gabriel Alves Barros \\[0.1cm]
-Gabriel Corrêa Costa \\[0.1cm]
+\textbf{Discentes:} Erick Gabriel Alves Barros, \\
+Gabriel Corrêa Costa e \\
 Gilberto Aparecido Dias Junior \\[0.2cm]
-\textbf{Período:} 7° Período \\[0.2cm]
+\textbf{Período:} 7° Período
 \end{flushright}
 
+\begin{center}
 \vfill
 Rio Verde (GO), \today
 \end{center}
@@ -99,7 +100,8 @@ Rio Verde (GO), \today
 \noindent Para inviabilizar a ocorrência de deadlocks ao realizar transferências simétricas cruzadas (por exemplo, transferências de A para B e de B para A concorrentemente), a aquisição dos locks ocorre de forma estritamente ordenada. A ordem é baseada na ordenação lexicográfica das chaves identificadoras (\texttt{id}) das contas envolvidas:
 
 \begin{lstlisting}[language=Java]
-Account firstLock = origin.getId().compareTo(destination.getId()) < 0 ? origin : destination;
+Account firstLock = origin.getId().compareTo(destination.getId()) < 0 
+    ? origin : destination;
 Account secondLock = firstLock == origin ? destination : origin;
 
 synchronized (firstLock) {
@@ -162,12 +164,12 @@ Ocorrência de Deadlock & Não Observado & Imune (Comprovado em Teste) \\
 \noindent O log de simulação a seguir demonstra a consistência final obtida na versão segura:
 
 \begin{lstlisting}[caption={Extrato Final de Execução da Simulação Segura}]
-[2026-06-08 00:56:46.226] [INFO] [Thread: main] === SIMULATION COMPLETED ===
-[2026-06-08 00:56:46.227] [INFO] [Thread: main] Final Balance Account A: 1000.00
-[2026-06-08 00:56:46.228] [INFO] [Thread: main] Final Balance Account B: 1000.00
-[2026-06-08 00:56:46.228] [INFO] [Thread: main] Actual total balance: 2000.00
-[2026-06-08 00:56:46.228] [INFO] [Thread: main] Invariant Total: 2000.00
-[2026-06-08 00:56:46.228] [INFO] [Thread: main] Balance divergence (Corruption): 0.00
+[main] === SIMULATION COMPLETED ===
+[main] Final Balance Account A: 1000.00
+[main] Final Balance Account B: 1000.00
+[main] Actual total balance: 2000.00
+[main] Invariant Total: 2000.00
+[main] Balance divergence (Corruption): 0.00
 \end{lstlisting}
 
 \noindent Conforme evidenciado, a divergência de saldo foi reduzida a zero absoluto mesmo sob stress elevado e com o dobro de threads concorrentes, provando que o mecanismo adotado garantiu consistência lógica e física total ao sistema financeiro concorrente.
