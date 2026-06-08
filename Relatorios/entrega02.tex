@@ -1,0 +1,185 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{times}
+\usepackage{tocloft}
+\usepackage[none]{hyphenat}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{colortbl}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{listings}
+\usepackage{courier}
+
+\geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
+\setlength{\headheight}{14.5pt}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.2cm}
+\renewcommand{\baselinestretch}{1.5}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Universidade de Rio Verde}
+\lhead{Desenvolvimento de Software para Concorrência}
+\rfoot{\thepage}
+
+\titleformat{\section}{\bfseries\large\raggedright}{\thesection.}{1em}{}
+\titleformat{\subsection}{\bfseries}{\thesubsection}{1em}{}
+\newcommand{\sectionbreak}{\clearpage}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\tocloftpagestyle{empty}
+
+% Configuração para listagem de logs e código
+\lstset{
+    basicstyle=\small\ttfamily,
+    columns=flexible,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10},
+    extendedchars=true,
+    showstringspaces=false
+}
+
+\begin{document}
+\sloppy
+
+% ====================================================================
+% CAPA
+% ====================================================================
+\begin{titlepage}
+\begin{center}
+\textbf{\large UNIVERSIDADE DE RIO VERDE}\\[1cm]
+\textbf{\large Engenharia de Software}\\[1cm]
+\textbf{\large Desenvolvimento de Software para Concorrência}\\[1cm]
+
+\vspace{2cm}
+
+\textbf{\LARGE Atividade Prática: Entrega 02}\\[0.5cm]
+\textbf{\Large Soluções de Concorrência e Análise Comparativa}\\[3cm]
+
+\begin{flushright}
+\textbf{Docente:} Prof. Gustavo Martins Lima \\[0.2cm]
+\textbf{Discentes:} \\[0.1cm]
+Erick Gabriel Alves Barros \\[0.1cm]
+Gabriel Corrêa Costa \\[0.1cm]
+Gilberto Aparecido Dias Junior \\[0.2cm]
+\textbf{Período:} 7° Período \\[0.2cm]
+\end{flushright}
+
+\vfill
+Rio Verde (GO), \today
+\end{center}
+\end{titlepage}
+
+% ====================================================================
+\section{Introdução e Contextualização}
+% ====================================================================
+
+\noindent Na primeira etapa deste trabalho, implementou-se uma simulação concorrente de transferências bancárias sem proteção de exclusão mútua. O resultado experimental daquela entrega evidenciou a ocorrência de condições de corrida (Lost Updates), ocasionando a corrupção do saldo consolidado do sistema e violando a integridade física dos dados financeiros.
+
+\noindent O objetivo desta segunda etapa é refatorar o sistema aplicando mecanismos avançados de concorrência que corrijam o problema e mantenham a invariabilidade do saldo consolidado, garantindo proteção contra condições de corrida e, concomitantemente, imunidade a deadlocks (impasses).
+
+% ====================================================================
+\section{Solução Concorrente Implementada}
+% ====================================================================
+
+\noindent A fim de solucionar o problema de concorrência com segurança e eficiência, implementou-se a classe \texttt{SafeTransferService}. O serviço realiza a exclusão mútua nas contas participantes da transação por meio de blocos aninhados \texttt{synchronized} (monitores em Java).
+
+\noindent Para inviabilizar a ocorrência de deadlocks ao realizar transferências simétricas cruzadas (por exemplo, transferências de A para B e de B para A concorrentemente), a aquisição dos locks ocorre de forma estritamente ordenada. A ordem é baseada na ordenação lexicográfica das chaves identificadoras (\texttt{id}) das contas envolvidas:
+
+\begin{lstlisting}[language=Java]
+Account firstLock = origin.getId().compareTo(destination.getId()) < 0 ? origin : destination;
+Account secondLock = firstLock == origin ? destination : origin;
+
+synchronized (firstLock) {
+    synchronized (secondLock) {
+        executeTransfer(origin, destination, amount);
+    }
+}
+\end{lstlisting}
+
+\noindent Essa abordagem assegura que qualquer thread necessitando dos recursos de A e B irá sempre solicitar o lock de menor identificador primeiro, eliminando o ciclo de espera mútuo.
+
+% ====================================================================
+\section{Justificativa do Mecanismo Adotado}
+% ====================================================================
+
+\noindent A escolha por blocos \texttt{synchronized} aninhados com ordenação determinística de identificadores é justificada pelos seguintes aspectos técnicos:
+
+\begin{enumerate}
+    \item \textbf{Prevenção Total de Deadlock:} Ao impor uma ordenação global na aquisição de locks, quebra-se a condição de espera circular de Coffman. O sistema elimina a necessidade de lógicas complexas de detecção e recuperação de deadlocks em tempo de execução.
+    \item \textbf{Alta Granularidade (Fine-Grained Locking):} Diferente de sincronizar o método inteiro de transferência (o que tornaria todas as transferências estritamente sequenciais no sistema todo), o bloqueio ocorre apenas nas referências das duas contas específicas envolvidas na transação. Isso permite transferências paralelas simultâneas entre outras contas independentes.
+    \item \textbf{Monitores Internos da JVM:} Blocos \texttt{synchronized} são primitivas nativas e extremamente otimizadas pelo compilador Java e pela JVM. Além disso, os locks são automaticamente liberados em caso de exceções inesperadas dentro do bloco, impedindo o vazamento de travas (lock leaks) que poderiam ocorrer com APIs de trava manual se não estivessem devidamente envolvidas em blocos try-finally.
+\end{enumerate}
+
+% ====================================================================
+\section{Testes de Stress e Prevenção de Deadlocks}
+% ====================================================================
+
+\noindent O sistema foi submetido a rigorosos testes de estresse em ambiente de simulação concorrente:
+
+\begin{itemize}
+    \item \textbf{Teste de Stress de Concorrência:} Execução concorrente com 8 threads simultâneas simulando um montante agregado de 1000 transações paralelas aleatórias entre duas contas sob latência de concorrência.
+    \item \textbf{Teste de Imunidade a Deadlock:} Duas threads executando transferências cruzadas repetidas infinitamente em sentidos opostos (A para B e B para A) concorrentemente.
+\end{itemize}
+
+\noindent A suíte de testes foi estruturada com barreiras de inicialização do tipo \texttt{CountDownLatch} para garantir partida sincronizada de todas as threads, forçando concorrência máxima de hardware.
+
+% ====================================================================
+\section{Análise Comparativa dos Resultados}
+% ====================================================================
+
+\noindent A tabela comparativa a seguir consolida o comportamento do sistema antes e depois das correções introduzidas:
+
+\begin{table}[h]
+\centering
+\caption{Comparativo das Métricas de Execução}
+\begin{tabular}{lll}
+\toprule
+\textbf{Métrica} & \textbf{Versão Ingênua (Entrega 1)} & \textbf{Versão Segura (Entrega 2)} \\
+\midrule
+Threads Simultâneas & 4 & 8 \\
+Volume de Transações & 100 & 1000 \\
+Saldo Inicial Total & R\$ 2000,00 & R\$ 2000,00 \\
+Saldo Final Total & R\$ 2120,00 (Variável) & R\$ 2000,00 (Estável) \\
+Divergência de Saldo & -R\$ 120,00 (Divergente) & R\$ 0,00 (Correto) \\
+Ocorrência de Deadlock & Não Observado & Imune (Comprovado em Teste) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent O log de simulação a seguir demonstra a consistência final obtida na versão segura:
+
+\begin{lstlisting}[caption={Extrato Final de Execução da Simulação Segura}]
+[2026-06-08 00:56:46.226] [INFO] [Thread: main] === SIMULATION COMPLETED ===
+[2026-06-08 00:56:46.227] [INFO] [Thread: main] Final Balance Account A: 1000.00
+[2026-06-08 00:56:46.228] [INFO] [Thread: main] Final Balance Account B: 1000.00
+[2026-06-08 00:56:46.228] [INFO] [Thread: main] Actual total balance: 2000.00
+[2026-06-08 00:56:46.228] [INFO] [Thread: main] Invariant Total: 2000.00
+[2026-06-08 00:56:46.228] [INFO] [Thread: main] Balance divergence (Corruption): 0.00
+\end{lstlisting}
+
+\noindent Conforme evidenciado, a divergência de saldo foi reduzida a zero absoluto mesmo sob stress elevado e com o dobro de threads concorrentes, provando que o mecanismo adotado garantiu consistência lógica e física total ao sistema financeiro concorrente.
+
+% ====================================================================
+\section{Limitações, Dificuldades e Conclusão}
+% ====================================================================
+
+\subsection{Dificuldades Encontradas}
+\noindent A principal dificuldade consistiu em modelar a concorrência em ambiente local de forma que as falhas e correções pudessem ser capturadas de forma reprodutível e robusta por meio de testes automatizados, e configurar o redirecionamento adequado de streams de erros (stderr) em ambientes PowerShell, contornando limitações de codificação e arquivos em branco.
+
+\subsection{Conclusão}
+\noindent O desenvolvimento deste projeto incremental permitiu fixar empiricamente a física por trás de condições de corrida e lost updates. Ao aplicar ordenação de locks por chaves identificadoras e exclusão mútua fina via monitores, provou-se que é possível alcançar corretude matemática e imunidade a impasses sob concorrência massiva de execução.
+
+\end{document}
