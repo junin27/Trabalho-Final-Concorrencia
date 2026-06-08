@@ -1,0 +1,20 @@
+# Maven
+target/
+*.releaseBackup
+
+# IDEs
+.idea/
+*.iml
+*.iws
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

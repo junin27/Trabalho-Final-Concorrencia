@@ -1,0 +1,172 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{setspace}
+\usepackage{geometry}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{times}
+\usepackage{tocloft}
+\usepackage[none]{hyphenat}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{colortbl}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{listings}
+\usepackage{courier}
+
+\geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
+\setlength{\headheight}{14.5pt}
+\setlength{\parindent}{1.25cm}
+\setlength{\parskip}{0.2cm}
+\renewcommand{\baselinestretch}{1.5}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Universidade de Rio Verde}
+\lhead{Desenvolvimento de Software para Concorrência}
+\rfoot{\thepage}
+
+\titleformat{\section}{\bfseries\large\raggedright}{\thesection.}{1em}{}
+\titleformat{\subsection}{\bfseries}{\thesubsection}{1em}{}
+\newcommand{\sectionbreak}{\clearpage}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\tocloftpagestyle{empty}
+
+% Configuração para listagem de código java/logs
+\lstset{
+    basicstyle=\small\ttfamily,
+    columns=flexible,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10},
+    extendedchars=true,
+    showstringspaces=false
+}
+
+\begin{document}
+\sloppy
+
+% ====================================================================
+% CAPA
+% ====================================================================
+\begin{titlepage}
+\begin{center}
+\textbf{\large UNIVERSIDADE DE RIO VERDE}\\[1cm]
+\textbf{\large Engenharia de Software}\\[1cm]
+\textbf{\large Desenvolvimento de Software para Concorrência}\\[1cm]
+
+\vspace{2cm}
+
+\textbf{\LARGE Atividade Prática: Entrega 01}\\[0.5cm]
+\textbf{\Large Implementação Ingênua e Diagnóstico de Concorrência}\\[3cm]
+
+\begin{flushright}
+\textbf{Docente:} Prof. Gustavo Martins Lima \\[0.2cm]
+\textbf{Discentes:} \\[0.1cm]
+Erick Gabriel Alves Barros \\[0.1cm]
+Gabriel Corrêa Costa \\[0.1cm]
+Gilberto Aparecido Dias Junior \\[0.2cm]
+\textbf{Período:} 7° Período \\[0.2cm]
+\end{flushright}
+
+\vfill
+Rio Verde (GO), \today
+\end{center}
+\end{titlepage}
+
+% ====================================================================
+\section{Descrição do Domínio e Recursos Compartilhados}
+% ====================================================================
+
+\noindent O domínio de negócio escolhido para este projeto é o de um \textbf{Banco Digital}. O problema central de concorrência modelado reside no processamento de transferências simultâneas de valores monetários entre contas bancárias distintas, sem que haja corrupção dos saldos ou violação da invariante fundamental de conservação de valores.
+
+\noindent Os principais elementos do domínio e os recursos compartilhados envolvidos na simulação são:
+\begin{itemize}
+    \item \textbf{Contas Bancárias (Accounts):} Recursos compartilhados mutáveis que representam as contas de origem e destino dos fundos. Cada conta armazena o seu saldo (\textit{balance}) modelado com precisão via classe \texttt{BigDecimal}.
+    \item \textbf{Processador de Transações (NaiveTransferService):} O serviço responsável por realizar a transferência executando a leitura do saldo das duas contas, a validação de fundos suficientes, e a posterior gravação dos novos saldos calculados.
+\end{itemize}
+
+\noindent O fluxo concorrente consiste em múltiplas threads operando simultaneamente sobre os mesmos saldos de conta. As threads leem o saldo atual, calculam o novo valor e o escrevem de volta. Sem mecanismos de exclusão mútua ou atomicidade, esse fluxo leva ao problema do \textit{Lost Update} (Atualização Perdida).
+
+% ====================================================================
+\section{Modelagem das Threads e Concorrência}
+% ====================================================================
+
+\noindent A simulação foi projetada para expor e demonstrar de forma inequívoca os problemas de concorrência. A modelagem concorrente baseia-se nos seguintes aspectos técnicos:
+
+\begin{enumerate}
+    \item \textbf{ExecutorService (Pool de Threads):} Foi criada um pool fixo de 4 threads concorrentes para processar as transferências. Isso simula um ambiente de microsserviço ou servidor web que atende a requisições de múltiplos clientes paralelamente.
+    \item \textbf{CountDownLatch (Barreira de Sincronização):} Para maximizar a probabilidade de concorrência real e o entrelaçamento dos ciclos de leitura-escrita, foi utilizado um \texttt{CountDownLatch} (\texttt{startLatch}). Ele garante que as 4 threads permaneçam em espera e iniciem a execução simultaneamente assim que liberadas pela thread principal (\texttt{main}). Outro latch (\texttt{finishLatch}) é utilizado para que a thread principal aguarde o término de todas as operações antes de inspecionar o saldo final.
+    \item \textbf{Atraso Artificial (Sleep):} Para expor o problema concorrente de forma consistente, a classe \texttt{NaiveTransferService} introduz artificialmente um pequeno atraso de 10 milissegundos (\texttt{Thread.sleep}) entre a leitura dos saldos e a gravação correspondente. Esse intervalo representa a latência de processamento real ou I/O e assegura que uma thread faça a leitura de dados desatualizados antes que a outra consiga finalizar a gravação.
+\end{enumerate}
+
+% ====================================================================
+\section{Diagnóstico de Problemas Concorrentes e Inconsistências}
+% ====================================================================
+
+\noindent Na simulação implementada nesta entrega, os seguintes problemas clássicos de concorrência foram identificados e diagnosticados:
+
+\subsection{Condição de Corrida (Race Condition) e Lost Update}
+O problema central é a ausência de exclusão mútua na operação de transferência. Como os métodos de leitura (\texttt{getBalance}) e escrita (\texttt{setBalance}) ocorrem de forma não-atômica e isolada:
+\begin{align*}
+    \text{Thread 1} &\longrightarrow \text{Lê Saldo da Conta A (ex: 1000.00)} \\
+    \text{Thread 2} &\longrightarrow \text{Lê Saldo da Conta A (ex: 1000.00)} \\
+    \text{Thread 1} &\longrightarrow \text{Grava Saldo da Conta A como A - 10.00 (990.00)} \\
+    \text{Thread 2} &\longrightarrow \text{Grava Saldo da Conta A como A - 10.00 (990.00)}
+\end{align*}
+Nesse cenário, uma das transferências (saque) foi efetivamente perdida e o saldo consolidado tornou-se inconsistente. O mesmo comportamento ocorre na operação de depósito da conta destino.
+
+\subsection{Violação da Invariante de Saldo Consolidado}
+Em um sistema bancário correto, a soma de todos os saldos no sistema fechado deve ser conservada. Se a conta A e a conta B começaram com 1000.00 cada (total 2000.00), e o único fluxo financeiro são transferências mútuas entre elas, o saldo total final consolidado deve obrigatoriamente continuar sendo 2000.00. Devido às atualizações perdidas, a soma final diverge, demonstrando a corrupção de dados.
+
+% ====================================================================
+\section{Evidências de Execução e Logs do Sistema}
+% ====================================================================
+
+\noindent A simulação foi executada sob as seguintes condições parametrizadas:
+\begin{itemize}
+    \item Saldo Inicial por Conta: \$1.000,00
+    \item Saldo Inicial Consolidado (Esperado): \$2.000,00
+    \item Threads Simultâneas: 4
+    \item Total de Transferências Efetuadas: 100 (de \$10,00 cada)
+\end{itemize}
+
+\noindent A listagem a seguir apresenta o extrato final do console gerado durante a execução da simulação. O formato do log exibe a data/hora, a severidade, o nome da thread correspondente e a operação realizada:
+
+\begin{lstlisting}[caption={Log de Execução Expondo a Condição de Corrida}]
+[2026-06-08 00:36:31.320] [INFO] [Thread: pool-1-thread-2] Transferred 10.00: Account 2 (bal: 1040.00) -> 1 (bal: 1000.00)
+[2026-06-08 00:36:31.320] [INFO] [Thread: pool-1-thread-4] Transferred 10.00: Account 2 (bal: 1020.00) -> 1 (bal: 1000.00)
+[2026-06-08 00:36:31.336] [INFO] [Thread: pool-1-thread-4] Transferred 10.00: Account 2 (bal: 1030.00) -> 1 (bal: 1010.00)
+...
+[2026-06-08 00:36:31.554] [INFO] [Thread: main] === SIMULATION COMPLETED ===
+[2026-06-08 00:36:31.554] [INFO] [Thread: main] Final Balance Account A: 1010.00
+[2026-06-08 00:36:31.554] [INFO] [Thread: main] Final Balance Account B: 1030.00
+[2026-06-08 00:36:31.554] [INFO] [Thread: main] Actual total balance: 2040.00
+[2026-06-08 00:36:31.555] [INFO] [Thread: main] Invariant Total: 2000.00
+[2026-06-08 00:36:31.556] [INFO] [Thread: main] Balance divergence (Corruption): -40.00
+\end{lstlisting}
+
+\noindent \textbf{Análise do Resultado:} O saldo consolidado final obtido foi de \$2.040,00, gerando uma divergência de \$40,00 adicionais que foram "criados" indevidamente em decorrência de escritas sobrepostas de leituras obsoletas. Isso atesta empiricamente a presença de falhas críticas de concorrência no código ingênuo.
+
+% ====================================================================
+\section{Boas Práticas de Engenharia Adotadas}
+% ====================================================================
+
+\noindent Apesar da simulação possuir problemas concorrentes intencionais, o código-fonte foi desenvolvido sob rigorosas práticas profissionais de engenharia:
+\begin{itemize}
+    \item \textbf{TDD (Test-Driven Development):} Escreveram-se os testes unitários e de concorrência antes da lógica de produção, assegurando que o comportamento concorrente incorreto seja assinalado de forma automatizada.
+    \item \textbf{Injeção de Dependências:} Desacoplamento de comportamentos e serviços com injeção via construtor, facilitando mockagem e isolamento.
+    \item \textbf{Classes Coesas e Funções Curtas:} Métodos e funções mantidos estritamente no intervalo de 4 a 20 linhas de execução. Classes com responsabilidade única e totalizando menos de 300 linhas de código.
+    \item \textbf{Logging Estruturado:} Substituição de \texttt{System.out.println} pelo uso padronizado do \texttt{java.util.logging.Logger} com formatação detalhada de threads.
+    \item \textbf{Integração Contínua (CI):} Workflow configurado via GitHub Actions para validação automatizada dos testes a cada commit.
+\end{itemize}
+
+\end{document}
