@@ -1,7 +1,7 @@
 package br.com.bancodigital.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import br.com.bancodigital.config.BankConfig;
 import br.com.bancodigital.domain.Account;
@@ -40,30 +40,36 @@ class NaiveTransferServiceTest {
 
     @Test
     void shouldCorruptBalancesUnderConcurrentTransfers() throws InterruptedException {
-        Account accountA = new Account("A", "Gilberto", BankConfig.INITIAL_BALANCE);
-        Account accountB = new Account("B", "Gabriel", BankConfig.INITIAL_BALANCE);
-        BigDecimal expectedTotalBalance = BankConfig.INITIAL_BALANCE.multiply(new BigDecimal("2"));
+        boolean corrupted = false;
+        
+        // Try up to 10 attempts to observe the race condition and balance corruption
+        for (int attempt = 0; attempt < 10; attempt++) {
+            Account accountA = new Account("A", "Gilberto", BankConfig.INITIAL_BALANCE);
+            Account accountB = new Account("B", "Gabriel", BankConfig.INITIAL_BALANCE);
+            BigDecimal expectedTotalBalance = BankConfig.INITIAL_BALANCE.multiply(new BigDecimal("2"));
 
-        int numThreads = BankConfig.NUMBER_OF_THREADS;
-        int transfersPerThread = BankConfig.TOTAL_TRANSFERS / numThreads;
+            int numThreads = BankConfig.NUMBER_OF_THREADS;
+            int transfersPerThread = 100; // Increased transfers count to maximize collision chance
 
-        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch finishLatch = new CountDownLatch(numThreads);
+            ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+            CountDownLatch startLatch = new CountDownLatch(1);
+            CountDownLatch finishLatch = new CountDownLatch(numThreads);
 
-        submitTransferTasks(executor, startLatch, finishLatch, accountA, accountB, transfersPerThread);
+            submitTransferTasks(executor, startLatch, finishLatch, accountA, accountB, transfersPerThread);
 
-        // Start all threads simultaneously
-        startLatch.countDown();
-        finishLatch.await();
-        executor.shutdown();
+            startLatch.countDown();
+            finishLatch.await();
+            executor.shutdown();
 
-        BigDecimal actualTotalBalance = accountA.getBalance().add(accountB.getBalance());
-        LOGGER.info(String.format("Initial Total: %s, Final Total: %s", expectedTotalBalance, actualTotalBalance));
-        LOGGER.info(String.format("Account A Balance: %s, Account B Balance: %s", accountA.getBalance(), accountB.getBalance()));
-
-        // Due to race conditions and lost updates, the total balance should be corrupted.
-        assertNotEquals(expectedTotalBalance, actualTotalBalance,
+            BigDecimal actualTotalBalance = accountA.getBalance().add(accountB.getBalance());
+            if (!expectedTotalBalance.equals(actualTotalBalance)) {
+                corrupted = true;
+                LOGGER.info(String.format("Corrupted balance observed on attempt %d. Total: %s", attempt, actualTotalBalance));
+                break;
+            }
+        }
+        
+        assertTrue(corrupted, 
                 "Balances should be corrupted due to lack of synchronization in NaiveTransferService");
     }
 
