@@ -42,7 +42,7 @@
 
 % Configuração para listagem de código java/logs
 \lstset{
-    basicstyle=\small\ttfamily,
+    basicstyle=\scriptsize\ttfamily,
     columns=flexible,
     breaklines=true,
     frame=single,
@@ -67,16 +67,17 @@
 
 \textbf{\LARGE Atividade Prática: Entrega 01}\\[0.5cm]
 \textbf{\Large Implementação Ingênua e Diagnóstico de Concorrência}\\[3cm]
+\end{center}
 
 \begin{flushright}
 \textbf{Docente:} Prof. Gustavo Martins Lima \\[0.2cm]
-\textbf{Discentes:} \\[0.1cm]
-Erick Gabriel Alves Barros \\[0.1cm]
-Gabriel Corrêa Costa \\[0.1cm]
+\textbf{Discentes:} Erick Gabriel Alves Barros, \\
+Gabriel Corrêa Costa e \\
 Gilberto Aparecido Dias Junior \\[0.2cm]
-\textbf{Período:} 7° Período \\[0.2cm]
+\textbf{Período:} 7° Período
 \end{flushright}
 
+\begin{center}
 \vfill
 Rio Verde (GO), \today
 \end{center}
@@ -142,16 +143,16 @@ Em um sistema bancário correto, a soma de todos os saldos no sistema fechado de
 \noindent A listagem a seguir apresenta o extrato final do console gerado durante a execução da simulação. O formato do log exibe a data/hora, a severidade, o nome da thread correspondente e a operação realizada:
 
 \begin{lstlisting}[caption={Log de Execução Expondo a Condição de Corrida}]
-[2026-06-08 00:36:31.320] [INFO] [Thread: pool-1-thread-2] Transferred 10.00: Account 2 (bal: 1040.00) -> 1 (bal: 1000.00)
-[2026-06-08 00:36:31.320] [INFO] [Thread: pool-1-thread-4] Transferred 10.00: Account 2 (bal: 1020.00) -> 1 (bal: 1000.00)
-[2026-06-08 00:36:31.336] [INFO] [Thread: pool-1-thread-4] Transferred 10.00: Account 2 (bal: 1030.00) -> 1 (bal: 1010.00)
+[thread-2] Transferred 10.00: Account 2 (bal: 1040.00) -> 1 (bal: 1000.00)
+[thread-4] Transferred 10.00: Account 2 (bal: 1020.00) -> 1 (bal: 1000.00)
+[thread-4] Transferred 10.00: Account 2 (bal: 1030.00) -> 1 (bal: 1010.00)
 ...
-[2026-06-08 00:36:31.554] [INFO] [Thread: main] === SIMULATION COMPLETED ===
-[2026-06-08 00:36:31.554] [INFO] [Thread: main] Final Balance Account A: 1010.00
-[2026-06-08 00:36:31.554] [INFO] [Thread: main] Final Balance Account B: 1030.00
-[2026-06-08 00:36:31.554] [INFO] [Thread: main] Actual total balance: 2040.00
-[2026-06-08 00:36:31.555] [INFO] [Thread: main] Invariant Total: 2000.00
-[2026-06-08 00:36:31.556] [INFO] [Thread: main] Balance divergence (Corruption): -40.00
+[main] === SIMULATION COMPLETED ===
+[main] Final Balance Account A: 1010.00
+[main] Final Balance Account B: 1030.00
+[main] Actual total balance: 2040.00
+[main] Invariant Total: 2000.00
+[main] Balance divergence (Corruption): -40.00
 \end{lstlisting}
 
 \noindent \textbf{Análise do Resultado:} O saldo consolidado final obtido foi de \$2.040,00, gerando uma divergência de \$40,00 adicionais que foram "criados" indevidamente em decorrência de escritas sobrepostas de leituras obsoletas. Isso atesta empiricamente a presença de falhas críticas de concorrência no código ingênuo.
