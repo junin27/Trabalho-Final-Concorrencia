@@ -128,6 +128,9 @@ Nesse cenário, uma das transferências (saque) foi efetivamente perdida e o sal
 \subsection{Violação da Invariante de Saldo Consolidado}
 Em um sistema bancário correto, a soma de todos os saldos no sistema fechado deve ser conservada. Se a conta A e a conta B começaram com 1000.00 cada (total 2000.00), e o único fluxo financeiro são transferências mútuas entre elas, o saldo total final consolidado deve obrigatoriamente continuar sendo 2000.00. Devido às atualizações perdidas, a soma final diverge, demonstrando a corrupção de dados.
 
+\subsection{Ausência de Deadlock e Starvation}
+Os problemas de \textit{deadlock} e \textit{starvation} foram analisados e não estão presentes nesta implementação ingênua. O \textbf{deadlock} ocorre quando duas ou mais threads aguardam indefinidamente por recursos mantidos entre si. Como o \texttt{NaiveTransferService} não utiliza nenhum mecanismo de lock ou sincronização — os métodos \texttt{getBalance} e \texttt{setBalance} da classe \texttt{Account} operam diretamente sobre o campo sem guardar nenhum monitor — não há aquisição de recursos que possa gerar espera circular. Por outro lado, a \textbf{starvation} (inanição) ocorre quando uma thread é sistematicamente preterida e nunca obtém tempo de CPU. Como são submetidas exatamente quatro tarefas para o pool fixo de quatro threads, cada thread executa a sua própria tarefa sem disputa por uma fila compartilhada, e o escalonador da JVM garante tempo de CPU a todas elas. Portanto, o problema central desta implementação está restrito à condição de corrida descrita nas subseções anteriores.
+
 % ====================================================================
 \section{Evidências de Execução e Logs do Sistema}
 % ====================================================================
@@ -143,19 +146,19 @@ Em um sistema bancário correto, a soma de todos os saldos no sistema fechado de
 \noindent A listagem a seguir apresenta o extrato final do console gerado durante a execução da simulação. O formato do log exibe a data/hora, a severidade, o nome da thread correspondente e a operação realizada:
 
 \begin{lstlisting}[caption={Log de Execução Expondo a Condição de Corrida}]
-[thread-2] Transferred 10.00: Account 2 (bal: 1040.00) -> 1 (bal: 1000.00)
-[thread-4] Transferred 10.00: Account 2 (bal: 1020.00) -> 1 (bal: 1000.00)
-[thread-4] Transferred 10.00: Account 2 (bal: 1030.00) -> 1 (bal: 1010.00)
+[2026-06-08 00:46:40.151] [INFO] [Thread: pool-1-thread-4] Transferred 10.00: Account 2 (bal: 1010.00) -> 1 (bal: 1010.00)
+[2026-06-08 00:46:40.151] [INFO] [Thread: pool-1-thread-1] Transferred 10.00: Account 1 (bal: 1010.00) -> 2 (bal: 1010.00)
+[2026-06-08 00:46:40.151] [INFO] [Thread: pool-1-thread-3] Transferred 10.00: Account 1 (bal: 1010.00) -> 2 (bal: 1010.00)
 ...
-[main] === SIMULATION COMPLETED ===
-[main] Final Balance Account A: 1010.00
-[main] Final Balance Account B: 1030.00
-[main] Actual total balance: 2040.00
-[main] Invariant Total: 2000.00
-[main] Balance divergence (Corruption): -40.00
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] === SIMULATION COMPLETED ===
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] Final Balance Account A: 1030.00
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] Final Balance Account B: 1070.00
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] Actual total balance: 2100.00
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] Invariant Total: 2000.00
+[2026-06-08 00:46:40.525] [INFO] [Thread: main] Balance divergence (Corruption): -100.00
 \end{lstlisting}
 
-\noindent \textbf{Análise do Resultado:} O saldo consolidado final obtido foi de \$2.040,00, gerando uma divergência de \$40,00 adicionais que foram "criados" indevidamente em decorrência de escritas sobrepostas de leituras obsoletas. Isso atesta empiricamente a presença de falhas críticas de concorrência no código ingênuo.
+\noindent \textbf{Análise do Resultado:} O saldo consolidado final obtido foi de \$2.100,00, gerando uma divergência de \$100,00 adicionais que foram "criados" indevidamente em decorrência de escritas sobrepostas de leituras obsoletas. Vale ressaltar que, por se tratar de uma condição de corrida, o valor exato da divergência é não-determinístico e varia a cada execução; o que se mantém constante é a violação da invariante de conservação. Isso atesta empiricamente a presença de falhas críticas de concorrência no código ingênuo.
 
 % ====================================================================
 \section{Boas Práticas de Engenharia Adotadas}
