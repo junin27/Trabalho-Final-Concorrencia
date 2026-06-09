@@ -42,10 +42,14 @@
 
 % Configuração para listagem de código java/logs
 \lstset{
-    basicstyle=\scriptsize\ttfamily,
-    columns=flexible,
+    basicstyle=\tiny\ttfamily,
+    columns=fixed,
     breaklines=true,
+    breakatwhitespace=false,
+    breakindent=0pt,
+    postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
     frame=single,
+    framexleftmargin=2pt,
     backgroundcolor=\color{gray!10},
     extendedchars=true,
     showstringspaces=false
